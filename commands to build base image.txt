@@ -1,0 +1,18 @@
+1.replace .cargo/config.toml with the following:
+[source.vendored-sources]
+directory = "vendor"
+
+2.run: cargo clean; cargo update
+3.run: cargo vendor --locked --versioned-dirs --manifest-path Cargo.toml vendor/
+4.replace .cargo/config.toml with the following:
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"
+
+5. delete the image from docker desktop if exists
+6. run: docker build -t rust_offline_oracle_base:v23.7 .
+7. run: docker save rust_offline_oracle_base:v23.7 -o rust_offline_oracle_base_23.7.tar
+#next step is to make sure its working fine and you can check it in project use_dummy_project
+8. run: docker load -i rust_offline_oracle_base_23.7.tar

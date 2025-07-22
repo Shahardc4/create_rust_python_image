@@ -1,0 +1,74 @@
+##############################
+# 1?? ��� Build � ���������   #
+##############################
+FROM debian:bookworm AS builder
+
+
+ARG PYTHON_VERSION=3.11.2
+ARG DEBIAN_FRONTEND=noninteractive
+
+# ��������� ��� + ����������   
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates curl build-essential \
+      libssl-dev zlib1g-dev libbz2-dev libreadline-dev \
+      libsqlite3-dev libncursesw5-dev xz-utils tk-dev \
+      libffi-dev liblzma-dev uuid-dev \
+      && rm -rf /var/lib/apt/lists/*
+#dont know if this belongs here or not, confused versions
+# RUN curl -O https://www.python.org/ftp/python/3.11.9/Python-3.11.9.tgz && \
+#     tar -xvf Python-3.11.9.tgz && \
+#     cd Python-3.11.9 && \
+#     ./configure --enable-optimizations && \
+#     make -j$(nproc) && \
+#     make altinstall && \
+#     ln -s /usr/local/bin/python3.11 /usr/bin/python3.11 && \
+#     ln -s /usr/local/bin/pip3.11 /usr/bin/pip3
+# ����� + ����� (SHA256 ����� ����� � �� ���� ��� �����)
+WORKDIR /tmp
+RUN curl -fsSLO https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz && \
+    echo "a1bf04f94bf0a9320754a724aa821027c570ddfa67f1b488a2404996cc300c34  Python-${PYTHON_VERSION}.tgz" | sha256sum -c -
+
+# �����, ���������, ����� �-/usr/local
+RUN tar -xzf Python-${PYTHON_VERSION}.tgz && \
+    cd Python-${PYTHON_VERSION} && \
+    ./configure --enable-optimizations --prefix=/usr/local --with-lto && \
+    make -j"$(nproc)" && \
+    make altinstall
+
+##############################
+# 2?? ��� Runtime � ��       #
+##############################
+FROM debian:bookworm-slim
+
+LABEL maintainer="you@example.com"
+ARG PYTHON_VERSION=3.11.2
+
+# ������ ���� ���� (��� gcc ���)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libssl3 zlib1g libbz2-1.0 libreadline8 libsqlite3-0 \
+      libncursesw5 libffi8 liblzma5 tk libuuid1 \
+      && rm -rf /var/lib/apt/lists/*
+
+# ����� Python �-builder
+COPY --from=builder /usr/local /usr/local
+
+# ����� ��� + PATH
+RUN ln -s /usr/local/bin/python3.11 /usr/local/bin/python && \
+    ln -s /usr/local/bin/pip3.11 /usr/local/bin/pip
+
+ENV PATH="/usr/local/bin:${PATH}"
+ENV PYTHONIOENCODING="utf-8" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# ����� ����� ���� build (�� ������ ���� �����)
+RUN python --version && python - <<'PY'
+import sys, ssl, sqlite3, uuid
+print("? Python works, ssl:", ssl.OPENSSL_VERSION.split()[0], "sqlite:", sqlite3.sqlite_version)
+PY
+
+##############################
+# 3?? �����-����             #
+##############################
+WORKDIR /app
+CMD ["python"]
